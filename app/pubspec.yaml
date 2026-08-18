@@ -1,0 +1,38 @@
+name: hand_pendant_app
+description: "Bo dieu khien khong day thay the cho tay bam ban mo Berchtold D760/D850 (ket noi Bluetooth toi bo trung gian ESP32)."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Thu vien BLE da nen tang (Android + iOS) dung de quet/ket noi/ghi characteristic toi ESP32.
+  # Dung dau ^ (chap nhan ban vá/minor moi hon trong pham vi 1.x) vi phien lam viec nay khong
+  # co mang toi pub.dev nen KHONG the tu kiem tra xem ban 1.32.12 cu the co ton tai hay khong -
+  # ghim cung mot con so co the khien `flutter pub get` that bai hoan toan neu doan phong doan
+  # sai. lib/ble/ble_manager.dart duoc viet theo API on dinh tu lau cua thu vien nay (startScan,
+  # scanResults, connect, discoverServices, characteristic.write, platformName, remoteId.str,
+  # advertisementData.advName). Neu sau khi `flutter pub get` ban pub chon 1 ban qua moi lam loi
+  # bien dich, hay ghim lai chinh xac 1 ban cu hon trong khoang 1.30-1.34 (xem CHANGELOG tren
+  # pub.dev) va chay lai.
+  flutter_blue_plus: ^1.32.12
+
+  # Xin quyen runtime (Bluetooth scan/connect tren Android 12+, location tren Android cu hon)
+  permission_handler: ^11.3.1
+
+  # Luu lua chon loai pendant (D760/D850) va thiet bi ket noi gan nhat giua cac lan mo app
+  shared_preferences: ^2.2.3
+
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

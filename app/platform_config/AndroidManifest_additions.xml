@@ -1,0 +1,29 @@
+<!--
+  HUONG DAN SU DUNG (xem chi tiet trong README.md muc "Build Android"):
+
+  1. Chay `flutter create .` trong thu muc goc du an (noi co pubspec.yaml) de Flutter tu
+     sinh ra thu muc android/ chuan cho phien ban SDK ban dang cai.
+  2. Mo file:  android/app/src/main/AndroidManifest.xml
+  3. Dan CAC DONG <uses-permission ...> va <uses-feature ...> ben duoi vao NGAY TRUOC the
+     <application ...> hien co trong file do (khong thay the ca file, chi chen them).
+  4. Trong the <application ...>, doi minSdkVersion trong android/app/build.gradle len it
+     nhat 21 (yeu cau cua flutter_blue_plus). Xem huong dan chi tiet trong README.md.
+-->
+
+<!-- Bluetooth co ban (can cho moi phien ban Android) -->
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+
+<!-- Android 12 (API 31) tro len: quyen quet/ket noi BLE rieng, khong dinh kem vi tri -->
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+<!--
+  Android 6 - 11 (API 23-30) bat buoc phai co quyen vi tri de quet BLE (gioi han cua he
+  dieu hanh, khong lien quan gi den viec app co dung du lieu vi tri hay khong). App nay
+  KHONG doc/luu vi tri nguoi dung o bat ky dau.
+-->
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+
+<!-- Khai bao thiet bi bat buoc phai ho tro BLE (an toan, khong bat buoc du lieu vi tri) -->
+<uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />

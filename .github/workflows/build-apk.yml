@@ -1,0 +1,102 @@
+name: Build Android APK (hand_pendant_app)
+
+# Cach dung:
+#   1. Tao 1 repo GitHub moi (public hoac private deu duoc), push toan bo thu muc
+#      hand_pendant_project/ (bao gom ca file workflow nay) len repo do.
+#   2. Vao tab "Actions" tren GitHub, workflow "Build Android APK (hand_pendant_app)"
+#      se tu chay sau khi push (hoac bam "Run workflow" de chay thu cong).
+#   3. Doi build xong (~5-8 phut), vao trang ket qua cua lan chay, keo xuong muc
+#      "Artifacts", tai file "hand-pendant-app-debug-apk" ve - ben trong la file .apk,
+#      chuyen vao dien thoai Android va cai (nho bat "Cai dat tu nguon khong xac dinh").
+#
+# Workflow nay chay tren may chu cua GitHub (co day du mang toi pub.dev / may chu Google),
+# tu tai Flutter SDK, tai thu vien, tu chen quyen Bluetooth vao AndroidManifest.xml, roi
+# build ra file APK ban debug (chua ky release, chi de CAI THU NGHIEM tren dien thoai ca
+# nhan, khong dung de phat hanh chinh thuc).
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout ma nguon
+        uses: actions/checkout@v4
+
+      - name: Cai dat Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+
+      - name: Tai thu vien Dart/Flutter
+        run: flutter pub get
+
+      - name: Sinh thu muc android/ (flutter create)
+        run: flutter create --platforms=android .
+
+      - name: Chen quyen Bluetooth vao AndroidManifest.xml
+        run: |
+          python3 - <<'PYEOF'
+          manifest_path = "android/app/src/main/AndroidManifest.xml"
+          additions_path = "platform_config/AndroidManifest_additions.xml"
+
+          with open(manifest_path, "r", encoding="utf-8") as f:
+              manifest = f.read()
+
+          with open(additions_path, "r", encoding="utf-8") as f:
+              additions_full = f.read()
+
+          # Bo phan comment huong dan o dau file additions, chi lay tu dong <uses-permission dau tien
+          marker = "<uses-permission"
+          idx = additions_full.find(marker)
+          additions = additions_full[idx:] if idx != -1 else additions_full
+
+          if "BLUETOOTH_SCAN" in manifest:
+              print("Manifest da co quyen Bluetooth, bo qua buoc chen.")
+          else:
+              manifest = manifest.replace("<application", additions + "\n    <application", 1)
+              with open(manifest_path, "w", encoding="utf-8") as f:
+                  f.write(manifest)
+              print("Da chen quyen Bluetooth vao AndroidManifest.xml")
+          PYEOF
+
+      - name: Dam bao minSdkVersion >= 21
+        run: |
+          python3 - <<'PYEOF'
+          import re
+          path = "android/app/build.gradle"
+          try:
+              with open(path, "r", encoding="utf-8") as f:
+                  content = f.read()
+          except FileNotFoundError:
+              path = "android/app/build.gradle.kts"
+              with open(path, "r", encoding="utf-8") as f:
+                  content = f.read()
+
+          # Neu du an dang dung flutter.minSdkVersion (mac dinh moi cua Flutter template)
+          # thi khong can sua gi - ban than gia tri do da >= 21 tu lau. Chi canh bao neu
+          # thay 1 con so cu the nho hon 21 duoc ghi cung trong file.
+          match = re.search(r"minSdk(Version)?\s*=?\s*(\d+)", content)
+          if match and int(match.group(2)) < 21:
+              print(f"CANH BAO: minSdkVersion dang la {match.group(2)}, thu vien BLE can >= 21. "
+                    f"Vui long tu sua file {path}.")
+          else:
+              print("minSdkVersion on, khong can sua.")
+          PYEOF
+
+      - name: Build APK (debug)
+        run: flutter build apk --debug
+
+      - name: Tai APK len Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hand-pendant-app-debug-apk
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
