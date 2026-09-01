@@ -42,52 +42,10 @@ jobs:
         run: flutter create --platforms=android .
 
       - name: Chen quyen Bluetooth vao AndroidManifest.xml
-        run: |
-          python3 - <<'PYEOF'
-          manifest_path = "android/app/src/main/AndroidManifest.xml"
-          additions_path = "platform_config/AndroidManifest_additions.xml"
-
-          with open(manifest_path, "r", encoding="utf-8") as f:
-              manifest = f.read()
-
-          with open(additions_path, "r", encoding="utf-8") as f:
-              additions_full = f.read()
-
-                    marker_end = additions_full.find("-->")
-          additions = additions_full[marker_end + 3:].strip() if marker_end != -1 else additions_full.strip()
-
-          if "BLUETOOTH_SCAN" in manifest:
-              print("Manifest da co quyen Bluetooth, bo qua buoc chen.")
-          else:
-              manifest = manifest.replace("<application", additions + "\n\n    <application", 1)
-              with open(manifest_path, "w", encoding="utf-8") as f:
-                  f.write(manifest)
-              print("Da chen quyen Bluetooth vao AndroidManifest.xml")
-          PYEOF
+        run: python3 scripts/patch_manifest_permissions.py
 
       - name: Dam bao minSdkVersion >= 21
-        run: |
-          python3 - <<'PYEOF'
-          import re
-          path = "android/app/build.gradle"
-          try:
-              with open(path, "r", encoding="utf-8") as f:
-                  content = f.read()
-          except FileNotFoundError:
-              path = "android/app/build.gradle.kts"
-              with open(path, "r", encoding="utf-8") as f:
-                  content = f.read()
-
-          # Neu du an dang dung flutter.minSdkVersion (mac dinh moi cua Flutter template)
-          # thi khong can sua gi - ban than gia tri do da >= 21 tu lau. Chi canh bao neu
-          # thay 1 con so cu the nho hon 21 duoc ghi cung trong file.
-          match = re.search(r"minSdk(Version)?\s*=?\s*(\d+)", content)
-          if match and int(match.group(2)) < 21:
-              print(f"CANH BAO: minSdkVersion dang la {match.group(2)}, thu vien BLE can >= 21. "
-                    f"Vui long tu sua file {path}.")
-          else:
-              print("minSdkVersion on, khong can sua.")
-          PYEOF
+        run: python3 scripts/check_min_sdk.py
 
       - name: Build APK (debug)
         run: flutter build apk --debug
