@@ -53,15 +53,13 @@ jobs:
           with open(additions_path, "r", encoding="utf-8") as f:
               additions_full = f.read()
 
-          # Bo phan comment huong dan o dau file additions, chi lay tu dong <uses-permission dau tien
-          marker = "<uses-permission"
-          idx = additions_full.find(marker)
-          additions = additions_full[idx:] if idx != -1 else additions_full
+                    marker_end = additions_full.find("-->")
+          additions = additions_full[marker_end + 3:].strip() if marker_end != -1 else additions_full.strip()
 
           if "BLUETOOTH_SCAN" in manifest:
               print("Manifest da co quyen Bluetooth, bo qua buoc chen.")
           else:
-              manifest = manifest.replace("<application", additions + "\n    <application", 1)
+              manifest = manifest.replace("<application", additions + "\n\n    <application", 1)
               with open(manifest_path, "w", encoding="utf-8") as f:
                   f.write(manifest)
               print("Da chen quyen Bluetooth vao AndroidManifest.xml")
