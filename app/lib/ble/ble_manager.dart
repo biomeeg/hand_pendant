@@ -27,12 +27,20 @@ class BleManager {
   BluetoothDevice? _connectedDevice;
   BluetoothCharacteristic? _writeCharacteristic;
   StreamSubscription<BluetoothConnectionState>? _connectionSub;
+  StreamSubscription<List<int>>? _notifySub;
 
   final StreamController<PendantLinkState> _stateController =
       StreamController<PendantLinkState>.broadcast();
 
   /// Stream trang thai ket noi de UI lang nghe va cap nhat giao dien / dung heartbeat.
   Stream<PendantLinkState> get linkState => _stateController.stream;
+
+  final StreamController<String> _responseController =
+      StreamController<String>.broadcast();
+
+  /// Cac chuoi phan hoi firmware gui nguoc ve qua BLE Notify sau lenh Auth/SetPass/SetName
+  /// (vi du "AUTH_OK", "PASS_FAIL"...). Xem PendantAuthController de biet noi tieu thu.
+  Stream<String> get responses => _responseController.stream;
 
   PendantLinkState _lastState = PendantLinkState.disconnected;
   PendantLinkState get lastState => _lastState;
@@ -80,6 +88,8 @@ class BleManager {
       _connectionSub?.cancel();
       _connectionSub = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
+          _notifySub?.cancel();
+          _notifySub = null;
           _writeCharacteristic = null;
           _connectedDevice = null;
           _emit(PendantLinkState.disconnected);
@@ -107,6 +117,15 @@ class BleManager {
             'Day co phai la bo dieu khien ESP32 cua ban mo khong?');
       }
 
+      // Dang ky nhan Notify: firmware dung kenh nay de tra loi AUTH_OK/AUTH_FAIL,
+      // PASS_OK/PASS_FAIL, NAME_OK/NAME_FAIL sau khi app gui lenh Auth/SetPass/SetName.
+      await _notifySub?.cancel();
+      await foundChar.setNotifyValue(true);
+      _notifySub = foundChar.lastValueStream.listen((bytes) {
+        if (bytes.isEmpty) return;
+        _responseController.add(String.fromCharCodes(bytes));
+      });
+
       _connectedDevice = device;
       _writeCharacteristic = foundChar;
       _emit(PendantLinkState.connected);
@@ -120,6 +139,8 @@ class BleManager {
     try {
       await _connectedDevice?.disconnect();
     } finally {
+      await _notifySub?.cancel();
+      _notifySub = null;
       _writeCharacteristic = null;
       _connectedDevice = null;
       _emit(PendantLinkState.disconnected);
@@ -150,8 +171,24 @@ class BleManager {
     }
   }
 
+  /// Gui mat khau xac thuc. Firmware se tra loi qua [responses] bang AUTH_OK/AUTH_FAIL.
+  /// Bat buoc phai goi lai sau MOI lan ket noi moi (firmware tu reset trang thai xac
+  /// thuc ve false khi co ket noi BLE moi).
+  Future<void> sendAuth(String password) => sendCommand('$kCmdAuthPrefix$password');
+
+  /// Doi mat khau ket noi (yeu cau da xac thuc truoc). Firmware tra loi PASS_OK/PASS_FAIL.
+  Future<void> sendSetPassword(String oldPassword, String newPassword) =>
+      sendCommand('$kCmdSetPassPrefix$oldPassword:$newPassword');
+
+  /// Doi ten thiet bi BLE quang ba (yeu cau da xac thuc truoc). Firmware tra loi
+  /// NAME_OK/NAME_FAIL roi TU KHOI DONG LAI de quang ba ten moi - ket noi hien tai se
+  /// bi ngat ngay sau do, can quay lai man hinh quet va ket noi lai.
+  Future<void> sendSetName(String newName) => sendCommand('$kCmdSetNamePrefix$newName');
+
   void dispose() {
     _connectionSub?.cancel();
+    _notifySub?.cancel();
     _stateController.close();
+    _responseController.close();
   }
 }

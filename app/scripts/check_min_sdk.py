@@ -22,6 +22,9 @@ def main():
             content = f.read()
         path = FALLBACK_PATH
 
+    # Neu du an dang dung flutter.minSdkVersion (mac dinh moi cua Flutter template)
+    # thi khong can sua gi - ban than gia tri do da >= 21 tu lau. Chi canh bao neu
+    # thay 1 con so cu the nho hon 21 duoc ghi cung trong file.
     match = re.search(r"minSdk(Version)?\s*=?\s*(\d+)", content)
     if match and int(match.group(2)) < 21:
         print(f"CANH BAO: minSdkVersion dang la {match.group(2)}, thu vien BLE can >= 21. "

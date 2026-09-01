@@ -49,12 +49,27 @@ va ban do bit cho cac lenh do **khong doi mot chut nao** - chi bo sung, khong su
 
 | Thong so | Gia tri |
 |---|---|
-| Ten thiet bi quang ba | `MyESP32` |
+| Ten thiet bi quang ba | Mac dinh `MyESP32`, co the doi (xem muc 8) - ten hien tai luon la ten THAT ma thiet bi quang ba, ai quet Bluetooth cung thay duoc |
 | Service UUID | `4fafc201-1fb5-459e-8fcc-c5c9c331914b` |
-| Characteristic UUID (Read/Write) | `beb5483e-36e1-4688-b7f5-ea07361b26a8` |
-| Chieu du lieu | App → ESP32 (ghi text thuan, vi du `bt_TableUp`) |
+| Characteristic UUID (Ghi lenh + Notify phan hoi) | `beb5483e-36e1-4688-b7f5-ea07361b26a8` |
+| Chieu du lieu chinh | App → ESP32 (ghi text thuan, vi du `bt_TableUp`) |
+| Chieu phan hoi (BLE Notify, tu ban v3) | ESP32 → App, chi dung cho ket qua lenh Auth/SetPass/SetName (vi du `AUTH_OK`) |
 | Chu ky heartbeat cua app | 150ms trong luc con giu 1 nut |
 | Watchdog cua ESP32 | 500ms khong nhan duoc lenh → tu mo relay |
+
+### Lenh xac thuc / bao mat (tu ban v3)
+
+| Lenh app gui | Y nghia | Firmware phan hoi (qua Notify) |
+|---|---|---|
+| `bt_Auth:<mat_khau>` | Xac thuc cho phien ket noi BLE hien tai | `AUTH_OK` hoac `AUTH_FAIL` |
+| `bt_SetPass:<mat_khau_cu>:<mat_khau_moi>` | Doi mat khau ket noi (yeu cau da `AUTH_OK` truoc) | `PASS_OK` hoac `PASS_FAIL` |
+| `bt_SetName:<ten_moi>` | Doi ten quang ba BLE (yeu cau da `AUTH_OK` truoc); ESP32 luu ten roi **tu khoi dong lai** de quang ba ten moi | `NAME_OK` hoac `NAME_FAIL` |
+
+Firmware **tu dat lai trang thai "chua xac thuc" moi khi co 1 ket noi BLE moi** (kem ca sau khi doi
+ten va tu khoi dong lai) - app phai gui lai `bt_Auth:` sau moi lan ket noi/ket noi lai (app da tu
+dong lam viec nay bang mat khau da luu tren dien thoai). Lenh `bt_Stop` la **ngoai le duy nhat**:
+luon duoc firmware chap nhan bat ke da xac thuc hay chua, vi day chi la lenh mo relay (an toan),
+khong bao gio la hanh dong dieu khien nguy hiem.
 
 **Luong su kien khi nguoi dung nham giu 1 nut tren app:**
 
@@ -156,11 +171,15 @@ Cach an toan nhat: giu nguyen phien ban da ghim (`1.32.12`) tru khi co ly do cu 
 ## 4. Cau truc man hinh app
 
 - **Man hinh Quet/Ket noi**: xin quyen Bluetooth, quet thiet bi ten `MyESP32`, nham de ket noi.
-- **Man hinh Dieu khien**: giao dien nut bam mo phong theo tay bam that, tu doi bo cuc theo loai
-  pendant da chon (D760 co hang InstaDrive; D850 co hang Slide + Kidney), nut **DUNG KHAN CAP**
-  mau do luon hien co dinh, banner mau bao trang thai ket noi o tren cung.
+- **Man hinh Dieu khien**: giao dien nut bam mo phong theo tay bam that (thu nho de vua 1 man hinh,
+  khong can keo), tu doi bo cuc theo loai pendant da chon (D760 co hang InstaDrive; D850 co hang
+  Slide + Kidney), nut **DUNG KHAN CAP** mau do luon hien co dinh va luon bam duoc ngay khi co ket
+  noi (ke ca truoc khi nhap mat khau), banner mau bao trang thai ket noi o tren cung. Neu da ket
+  noi BLE nhung **chua xac thuc mat khau**, man hinh hien 1 o nhap mat khau thay cho cac nut dieu
+  khien (xem muc 8).
 - **Man hinh Cai dat**: chon loai pendant (D760/D850, luu lai giua cac lan mo app), xem thong tin
-  ket noi hien tai, xem thong so giao thuc, va ghi chu an toan.
+  ket noi hien tai, **doi mat khau ket noi**, **doi ten thiet bi (rieng cho admin)**, xem thong so
+  giao thuc, va huong dan thiet lap/su dung (xem muc 8).
 
 ---
 
@@ -197,3 +216,77 @@ Cach an toan nhat: giu nguyen phien ban da ghim (`1.32.12`) tru khi co ly do cu 
   phong mo, dieu chinh `kHeartbeatInterval` (app) va `WATCHDOG_TIMEOUT_MS` (firmware) cho phu hop.
 - Neu muon co canh bao pin yeu / trang thai loi tren app, can thiet ke them mach doc tin hieu va bo
   sung BLE Notify (hang muc phat trien them, chua co trong ban nay).
+
+---
+
+## 8. Mat khau ket noi, doi ten thiet bi va giao dien 1 man hinh (v3)
+
+Ban nay bo sung 3 thay doi theo yeu cau: (1) bo cac ghi chu/canh bao khong con phu hop tren man
+hinh Dieu khien va Cai dat, (2) yeu cau mat khau de ket noi/dieu khien (khoa that trong firmware,
+khong phai chi khoa tren app), (3) tinh nang doi ten thiet bi rieng cho admin, va (4) thu nho giao
+dien Dieu khien de vua het cac nut tren 1 man hinh.
+
+### 8.1 Mat khau ket noi (khoa o FIRMWARE, khong phai chi o app)
+
+- Khi ESP32 khoi dong lan dau (chua tung doi mat khau), mat khau ket noi mac dinh la **`0000`**.
+- Sau khi app ket noi BLE, man hinh Dieu khien se hien 1 o nhap mat khau **truoc khi** cho thao tac
+  bat ky nut dieu khien nao (tru nut DUNG KHAN CAP - luon mo). App gui lenh `bt_Auth:<mat_khau>`,
+  firmware kiem tra va tra loi `AUTH_OK`/`AUTH_FAIL` qua BLE Notify.
+- Vi kiem tra nam trong firmware (khong phai trong app), **khong the bo qua** bang cach sua/thay
+  app khac - bat ky ai muon gui lenh dieu khien xuong ban mo qua thiet bi nay deu phai qua duoc
+  buoc nay.
+- Nen doi mat khau `0000` mac dinh ngay sau lan ket noi dau tien, tai man hinh Cai dat → "Bao mat
+  ket noi" → nhap mat khau hien tai + mat khau moi → gui lenh `bt_SetPass:<cu>:<moi>`, firmware luu
+  mat khau moi vao bo nho flash (NVS qua thu vien `Preferences`) nen **giu nguyen sau khi mat dien/
+  khoi dong lai ESP32**.
+- App tu luu mat khau da xac thuc thanh cong tren dien thoai va **tu dong xac thuc lai** moi khi
+  ket noi lai (mo app lai, hoac Bluetooth vua mat roi noi lai) - khong phai nhap tay moi lan, tru
+  khi vua doi mat khau hoac dang dung dien thoai/thiet bi khac ket noi lan dau.
+- Firmware **luon dat lai ve trang thai chua xac thuc** moi khi co 1 ket noi BLE hoan toan moi -
+  day la thiet ke co chu dich, dam bao 1 phien ket noi cu (vi du bi ngat rot) khong the "tiep tuc"
+  dieu khien ma khong xac thuc lai.
+
+### 8.2 Doi ten thiet bi (chi danh cho admin)
+
+- Muc "Doi ten thiet bi (Admin)" trong Cai dat bi khoa sau 1 **mat khau admin rieng, co dinh trong
+  ma nguon app**: `admin123`. Day la 1 lop an kin de tranh nguoi dung thong thuong vo tinh bam vao
+  va doi nham ten thiet bi, **khong phai bien phap bao mat manh** - bat ky ai doc duoc ma nguon
+  hoac giai nen file APK deu co the tim thay chuoi nay (xem chu thich chi tiet trong
+  `app/lib/ble/pendant_protocol.dart`, hang so `kAdminUnlockPassword`). Neu can bao mat that su cho
+  tinh nang nay, phai doi hang so do va bien dich/build lai APK truoc khi phat cho nguoi khac dung.
+- Sau khi nhap dung mat khau admin va mat khau ket noi da duoc xac thuc (`AUTH_OK`), admin nhap ten
+  moi (toi da 20 ky tu) va gui lenh `bt_SetName:<ten_moi>`. Firmware luu ten vao flash roi
+  **tu khoi dong lai** de quang ba (advertise) BLE bang ten moi - day la hanh vi du kien, khong
+  phai loi (thu vien BLE cua ESP32 chi doc ten quang ba on dinh tu luc khoi dong).
+- Ten moi la ten quang ba BLE **that su** - bat ky thiet bi nao quet Bluetooth gan do (dien thoai
+  khac, app do BLE...) deu se thay ten moi nay, giong het nhu doi ten bat ky thiet bi Bluetooth
+  nao khac. Tuy nhien, **doi ten khong lam doi hay bo qua yeu cau mat khau ket noi** - ai quet thay
+  ten moi va thu ket noi/dieu khien van phai nhap dung mat khau ket noi hien tai (muc 8.1).
+- Sau khi doi ten, ket noi BLE hien tai se roi vao trang thai mat ket noi trong vai giay (do ESP32
+  dang khoi dong lai) - app hien nut tat "Ve man hinh quet lai" de nguoi dung quet va ket noi lai
+  voi thiet bi mang ten moi.
+
+### 8.3 Giao dien Dieu khien vua 1 man hinh
+
+Theo yeu cau, cac nut va khoang cach tren man hinh Dieu khien duoc thu nho (duong kinh nut giam,
+co chu nho hon, giam khoang cach doc) de toan bo cac hang nut cua ca 2 loai pendant (D760/D850)
+vua hien thi tren 1 man hinh dien thoai pho thong ma khong can keo len/xuong. Tuy nhien man hinh
+van duoc boc trong `SingleChildScrollView` de du phong cho man hinh rat nho hoac nguoi dung phong
+to chu he thong (accessibility) - trong dieu kien binh thuong se khong can keo.
+
+**Luu y:** cac thay doi trong muc 8 nay (auth firmware, doi ten, giao dien) **chua duoc build/nap
+thu thuc te trong phien lam viec nay** (khong co trinh bien dich Dart/Arduino trong moi truong
+sandbox) - da ra soat ky tung dong ma nguon thu cong nhung ban can: (1) nap lai firmware `.ino`
+moi vao ESP32 bang Arduino IDE, (2) push code app moi len GitHub va cho Actions build lai APK
+(Cach A, muc 3), (3) **kiem thu ky luong Auth/doi mat khau/doi ten tren ban khong co benh nhan**
+truoc khi tin tuong dua vao su dung thuc te, dung tinh than muc 5 va 7 o tren.
+
+---
+
+## 7. Nhat ky sua loi
+
+| Ngay | Loi | Nguyen nhan | Cach sua |
+|---|---|---|---|
+| 2026-08-19 | GitHub Actions bao do `Build APK (debug)`: `Error parsing LocalFile: ... AndroidManifest.xml ... Please ensure that the android manifest is a valid XML document` | Buoc "Chen quyen Bluetooth vao AndroidManifest.xml" trong `.github/workflows/build-apk.yml` dung `additions_full.find("<uses-permission")` de tim diem bat dau noi dung can chen. Nhung chinh khoi comment huong dan o dau file `platform_config/AndroidManifest_additions.xml` co cau vi du chua dung chuoi `<uses-permission ...>`, nen `.find()` bi "danh lua", cat nham ngay giua khoi comment huong dan - lam manifest sinh ra bi hong cu phap XML (comment khong dong dung). | Doi cach xac dinh diem bat dau: lay noi dung SAU dau `-->` DAU TIEN cua file additions (thay vi tim chuoi `<uses-permission`), dam bao luon bo qua trom ven khoi comment huong dan o dau file. |
+| 2026-09-01 | Sau khi tu sua truc tiep tren web GitHub, buoc "Chen quyen Bluetooth vao AndroidManifest.xml" bao `IndentationError: unexpected indent` tai dong `marker_end = additions_full.find("-->")`, that bai ngay lap tuc (0s). | Doan code sua o tren duoc nhung truc tiep trong YAML bang `python3 - <<'PYEOF' ... PYEOF` (heredoc), nen phai giu dung 2 lop thut le cung luc: thut le cua khoi `run: \|` trong YAML VA thut le cua chinh cau lenh Python. Khi dan de chinh sua tay tren trinh soan thao web cua GitHub, chi can lech 1 khoang trang la Python bao loi ngay. | Tach hoan toan 2 doan Python nhung trong workflow ra thanh 2 file rieng: `app/scripts/patch_manifest_permissions.py` va `app/scripts/check_min_sdk.py` (thut le binh thuong, khong con heredoc). File `.github/workflows/build-apk.yml` gio chi goi `python3 scripts/patch_manifest_permissions.py` va `python3 scripts/check_min_sdk.py` - moi lan can sua chi phai dan de toan bo 1 file `.py` doc lap, khong con phai giu dung 2 lop thut le long nhau nhu truoc. |
+| 2026-09-01 | Sau khi qua duoc 2 buoc chen quyen/check minSdk, buoc `Build APK (debug)` bao `FAILURE: Build completed with 2 failures`: `Could not get unknown property 'flutter' for extension 'android' of type com.android.build.gradle.LibraryExtension` va `compileSdkVersion is not specified. Please add it to build.gradle`, loi tai file cua thu vien `flutter_blue_plus_android-7.0.4` trong `.pub-cache`. | Workflow ghim cung `flutter-version: '3.24.5'`. Cac thu vien nhu `flutter_blue_plus_android` da cap nhat theo co che nap Flutter Gradle plugin kieu moi (chi ho tro tu Flutter 3.27 tro len). Dung Flutter 3.24.5 (cu hon) khien `flutter create` sinh ra project Android theo dinh dang Gradle cu, khong tuong thich - day la loi da duoc xac nhan tren chinh kho GitHub cua Flutter (xem `flutter/flutter#164362`, `fluttercommunity/plus_plugins#3742`). | Bo han dong ghim `flutter-version: '3.24.5'` trong buoc "Cai dat Flutter SDK", chi giu `channel: 'stable'` de CI luon dung ban Flutter stable moi nhat (tinh den 09/2026 la ban 3.47.x, da qua moc 3.27 can thiet). |

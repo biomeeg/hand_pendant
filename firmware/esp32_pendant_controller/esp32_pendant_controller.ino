@@ -18,11 +18,35 @@
     4. Sua loi SERIAL_NO dung nhay don sai cu phap (chuoi ky tu phai dung nhay kep).
     5. Gom cac ma lenh vao 1 bang tra cuu (struct) thay vi chuoi if/else lap lai, de de
        bao tri / mo rong sau nay.
+
+  Phien ban: v3 - bo sung xac thuc mat khau + doi ten thiet bi
+    6. Xac thuc mat khau ket noi: MOI lan co ket noi BLE moi, firmware bat dau o trang
+       thai CHUA xac thuc. Moi lenh dieu khien (ngoai bt_Stop - luon duoc phep vi chi mo
+       relay, khong bao gio nguy hiem) deu bi TU CHOI cho toi khi app gui dung lenh
+       "bt_Auth:<mat_khau>" khop voi mat khau dang luu. Muc dich: ngan thiet bi/app
+       Bluetooth la (khong phai app chinh thuc) vo tinh hoac co y dieu khien nham ban mo.
+       Mat khau luu trong bo nho flash (Preferences/NVS), doi duoc qua lenh
+       "bt_SetPass:<mat_khau_cu>:<mat_khau_moi>" (yeu cau da xac thuc truoc). Mac dinh khi
+       chua tung doi la "0000" - NEN DOI NGAY sau lan nap firmware/ket noi dau tien.
+       *** Luu y ve muc do an toan: mat khau luu o dang van ban thuong trong NVS, khong
+       ma hoa - du de ngan nham lan/vo tinh dieu khien nham, nhung KHONG phai bien phap
+       chong lai ai co the doc truc tiep bo nho flash cua ESP32 qua cong nap/debug. ***
+    7. Doi ten thiet bi BLE quang ba: lenh "bt_SetName:<ten_moi>" (yeu cau da xac thuc)
+       luu ten moi vao NVS roi TU KHOI DONG LAI de quang ba dung ten do (thu vien BLE cua
+       ESP32 chi dat duoc ten mot lan luc BLEDevice::init(), nen can khoi dong lai de ap
+       dung ten moi mot cach dang tin cay o moi phien ban thu vien). Truoc khi khoi dong
+       lai, firmware chu dong mo relay (an toan) va gui phan hoi NAME_OK qua BLE Notify
+       de app biet ma khong phai doi timeout.
+    8. Them BLE Notify (dac tinh PROPERTY_NOTIFY + descriptor BLE2902) de firmware co the
+       chu dong bao ket qua AUTH_OK/AUTH_FAIL, PASS_OK/PASS_FAIL, NAME_OK/NAME_FAIL nguoc
+       ve app, thay vi app phai doan hoac cho timeout.
 =============================================================================================*/
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
+#include <Preferences.h>
 
 //-----------------------------------------
 // Chan dieu khien 74HC595 (giu nguyen nhu firmware goc)
@@ -43,6 +67,29 @@
 // mang Bluetooth binh thuong, nhung cung khong duoc qua lon vi se lam giam tinh an toan.
 //-----------------------------------------
 #define WATCHDOG_TIMEOUT_MS  500
+
+//-----------------------------------------
+// Xac thuc mat khau + doi ten thiet bi (xem ghi chu v3 o dau file)
+//-----------------------------------------
+#define AUTH_PREFIX       "bt_Auth:"
+#define SET_PASS_PREFIX   "bt_SetPass:"
+#define SET_NAME_PREFIX   "bt_SetName:"
+
+#define REPLY_AUTH_OK     "AUTH_OK"
+#define REPLY_AUTH_FAIL   "AUTH_FAIL"
+#define REPLY_PASS_OK     "PASS_OK"
+#define REPLY_PASS_FAIL   "PASS_FAIL"
+#define REPLY_NAME_OK     "NAME_OK"
+#define REPLY_NAME_FAIL   "NAME_FAIL"
+
+#define DEFAULT_PASSWORD    "0000"
+#define DEFAULT_DEVICE_NAME "MyESP32"
+#define MAX_DEVICE_NAME_LEN 20   // gioi han an toan cho goi quang ba BLE
+
+Preferences prefs;             // luu mat khau + ten thiet bi ben trong flash (NVS)
+String storedPassword;         // nap tu prefs trong setup()
+String storedDeviceName;       // nap tu prefs trong setup()
+bool authenticated = false;    // reset ve false moi khi co 1 ket noi BLE MOI
 
 //===================================================================
 // Ban do lenh -> trang thai relay (3 byte, dua vao 74HC595 x3, MSB first)
@@ -100,6 +147,7 @@ bool deviceConnected = false;
 
 BLEServer *pServer = nullptr;
 BLEAdvertising *pAdvertising = nullptr;
+BLECharacteristic *pCharacteristic = nullptr;
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -125,6 +173,16 @@ void safetyStopRelays() {
 }
 
 //===================================================================
+// Gui phan hoi ve app qua BLE Notify (vi du "AUTH_OK", "PASS_FAIL"...). Khong lam gi
+// neu chua co characteristic hoac chua co ket noi (tranh loi khi goi qua som).
+//===================================================================
+void sendReply(const char *msg) {
+  if (pCharacteristic == nullptr || !deviceConnected) return;
+  pCharacteristic->setValue(msg);
+  pCharacteristic->notify();
+}
+
+//===================================================================
 // Tim lenh trong bang tra cuu theo ten, tra ve con tro bits hoac nullptr neu khong thay
 //===================================================================
 const byte *findCommandBits(const String &name) {
@@ -140,11 +198,15 @@ const byte *findCommandBits(const String &name) {
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *pServerParam) override {
     deviceConnected = true;
-    Serial.println("[BLE] Da ket noi voi app dieu khien");
+    // Moi ket noi BLE MOI deu phai xac thuc lai tu dau - khong "nho" trang thai da xac
+    // thuc cua lan ket noi truoc.
+    authenticated = false;
+    Serial.println("[BLE] Da ket noi voi app dieu khien - cho xac thuc mat khau (bt_Auth:...)");
   }
 
   void onDisconnect(BLEServer *pServerParam) override {
     deviceConnected = false;
+    authenticated = false;
     Serial.println("[BLE] Mat ket noi - tu dong dung moi chuyen dong (safety stop)");
     // An toan: mat ket noi giua chung khi dang giu phim -> mo relay ngay
     safetyStopRelays();
@@ -186,14 +248,25 @@ void setup() {
   Serial.print("Firmware bo dieu khien khong day - Serial: ");
   Serial.println(SERIAL_NO);
   //---------------------------------
-  BLEDevice::init("MyESP32");
+  // Nap mat khau + ten thiet bi da luu tu lan truoc (hoac gia tri mac dinh neu day la
+  // lan dau chay firmware nay / vua nap lai firmware moi).
+  prefs.begin("pendant", false);
+  storedPassword = prefs.getString("pass", DEFAULT_PASSWORD);
+  storedDeviceName = prefs.getString("name", DEFAULT_DEVICE_NAME);
+  Serial.print("Ten thiet bi BLE: ");
+  Serial.println(storedDeviceName);
+  //---------------------------------
+  BLEDevice::init(storedDeviceName.c_str());
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService *pService = pServer->createService(SERVICE_UUID);
-  BLECharacteristic *pCharacteristic =
+  pCharacteristic =
       pService->createCharacteristic(CHARACTERISTIC_UUID,
-                                      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+                                      BLECharacteristic::PROPERTY_READ |
+                                      BLECharacteristic::PROPERTY_WRITE |
+                                      BLECharacteristic::PROPERTY_NOTIFY);
+  pCharacteristic->addDescriptor(new BLE2902()); // bat buoc de Notify hoat dong tren hau het client
   pCharacteristic->setCallbacks(new MyCallbacks());
   pCharacteristic->setValue("Hello World");
   pService->start();
@@ -215,7 +288,70 @@ void loop() {
     bt_Read = "";
 
     if (cmd == "bt_Stop") {
+      // Luon cho phep dung khan cap, ke ca khi CHUA xac thuc - chi mo relay, khong bao
+      // gio la hanh dong nguy hiem nen khong can khoa lenh nay.
       safetyStopRelays();
+
+    } else if (cmd.startsWith(AUTH_PREFIX)) {
+      String pass = cmd.substring(strlen(AUTH_PREFIX));
+      if (pass == storedPassword) {
+        authenticated = true;
+        Serial.println("[AUTH] Xac thuc thanh cong");
+        sendReply(REPLY_AUTH_OK);
+      } else {
+        authenticated = false;
+        Serial.println("[AUTH] Sai mat khau ket noi");
+        sendReply(REPLY_AUTH_FAIL);
+      }
+
+    } else if (!authenticated) {
+      // Chua xac thuc -> tu choi MOI lenh khac (bao gom ca SetPass/SetName), ke ca neu
+      // ten lenh hop le. Day la lop an toan chinh chong ket noi/dieu khien ngoai y muon.
+      Serial.print("[AUTH] Tu choi lenh vi chua xac thuc: ");
+      Serial.println(cmd);
+
+    } else if (cmd.startsWith(SET_PASS_PREFIX)) {
+      // Dinh dang: bt_SetPass:<mat_khau_cu>:<mat_khau_moi>
+      String rest = cmd.substring(strlen(SET_PASS_PREFIX));
+      int sep = rest.indexOf(':');
+      if (sep < 0 || rest.substring(sep + 1).length() == 0) {
+        Serial.println("[AUTH] Lenh doi mat khau sai dinh dang");
+        sendReply(REPLY_PASS_FAIL);
+      } else {
+        String oldPass = rest.substring(0, sep);
+        String newPass = rest.substring(sep + 1);
+        if (oldPass == storedPassword) {
+          storedPassword = newPass;
+          prefs.putString("pass", storedPassword);
+          Serial.println("[AUTH] Da doi mat khau ket noi thanh cong");
+          sendReply(REPLY_PASS_OK);
+        } else {
+          Serial.println("[AUTH] Doi mat khau that bai: sai mat khau cu");
+          sendReply(REPLY_PASS_FAIL);
+        }
+      }
+
+    } else if (cmd.startsWith(SET_NAME_PREFIX)) {
+      String newName = cmd.substring(strlen(SET_NAME_PREFIX));
+      if (newName.length() == 0) {
+        Serial.println("[ADMIN] Ten thiet bi moi rong, tu choi");
+        sendReply(REPLY_NAME_FAIL);
+      } else {
+        if (newName.length() > MAX_DEVICE_NAME_LEN) {
+          newName = newName.substring(0, MAX_DEVICE_NAME_LEN);
+        }
+        storedDeviceName = newName;
+        prefs.putString("name", storedDeviceName);
+        Serial.print("[ADMIN] Da doi ten thiet bi thanh: ");
+        Serial.println(storedDeviceName);
+        sendReply(REPLY_NAME_OK);
+        delay(300); // cho goi Notify ACK toi app truoc khi khoi dong lai
+        safetyStopRelays();
+        Serial.println("[ADMIN] Khoi dong lai de quang ba ten moi...");
+        delay(200);
+        ESP.restart();
+      }
+
     } else {
       const byte *bits = findCommandBits(cmd);
       if (bits != nullptr) {

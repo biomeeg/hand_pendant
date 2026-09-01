@@ -17,7 +17,7 @@ class HoldButton extends StatefulWidget {
     required this.label,
     required this.icon,
     required this.connected,
-    this.diameter = 64,
+    this.diameter = 46,
     this.accentColor,
   });
 
@@ -102,16 +102,16 @@ class _HoldButtonState extends State<HoldButton> {
                   child: Icon(
                     widget.icon,
                     color: PendantColors.textDark,
-                    size: widget.diameter * 0.5,
+                    size: widget.diameter * 0.52,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   widget.label,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: PendantColors.textLight,
-                    fontSize: 11,
+                    fontSize: 9,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

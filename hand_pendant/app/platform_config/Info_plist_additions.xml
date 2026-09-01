@@ -1,0 +1,17 @@
+<!--
+  HUONG DAN SU DUNG (xem chi tiet trong README.md muc "Build iOS"):
+
+  1. Chay `flutter create .` trong thu muc goc du an de Flutter tu sinh thu muc ios/
+     (chi thuc hien duoc tren may Mac co Xcode).
+  2. Mo file: ios/Runner/Info.plist
+  3. Dan 2 cap key/string ben duoi vao BEN TRONG the <dict> ngoai cung hien co (truoc the
+     </dict> dong cuoi cung).
+  4. Trong Xcode, chon Runner target -> Signing & Capabilities -> chon Team cua ban va
+     Bundle Identifier rieng de ky app truoc khi build len iPhone that.
+-->
+
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>Ung dung can quyen Bluetooth de tim va ket noi toi bo dieu khien khong day cua ban mo phau thuat.</string>
+
+<key>NSBluetoothPeripheralUsageDescription</key>
+<string>Ung dung can quyen Bluetooth de tim va ket noi toi bo dieu khien khong day cua ban mo phau thuat.</string>
