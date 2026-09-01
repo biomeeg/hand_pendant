@@ -3,32 +3,35 @@ import 'package:flutter/material.dart';
 import '../ble/hold_command_controller.dart';
 import '../theme/pendant_theme.dart';
 
-/// Mot nut "nham giu" mo phong cong tac vat ly tren tay bam that.
+/// Mot nut "nham giu" dang VIEN THUOC (pill bo tron 2 dau), mo phong cong tac vat ly
+/// tren tay bam that - giao dien tham khao theo mau anh chup app dieu khien tuong tu
+/// nguoi dung cung cap (nut mau theo chuc nang, chu nam giua nut, khong dung icon).
 ///
 /// - Nham xuong: goi PendantInputCoordinator.press(commandId)
 /// - Nha ra / gesture bi huy (vi du keo tay ra khoi nut): goi .release(commandId)
-/// - Tu dong hien mau "dang nham" khi la nut active, va tu mo (khong bam duoc) khi:
-///     a) dang co nut KHAC duoc giu (chi 1 nut active tai 1 thoi diem), hoac
-///     b) [connected] = false (mat ket noi Bluetooth)
+/// - Tu dong sang mau hon khi dang duoc giu, va tu mo (khong bam duoc) khi
+///   PendantInputCoordinator.isBlocked(commandId) tra ve true - luu y: tu ban co them
+///   ngoai le LEG UP/DOWN duoc phep giu DONG THOI voi 1 trong 2 nut chon ben SPLIT LEG,
+///   nen logic khoa/mo nut nay do coordinator quyet dinh, khong con don gian la "chi 1
+///   nut duy nhat" nhu truoc.
 class HoldButton extends StatefulWidget {
   const HoldButton({
     super.key,
     required this.commandId,
     required this.label,
-    required this.icon,
     required this.connected,
-    this.diameter = 56,
-    this.accentColor,
+    this.color,
+    this.height = 52,
   });
 
   final String commandId;
   final String label;
-  final IconData icon;
   final bool connected;
-  final double diameter;
+  final double height;
 
-  /// Mau nhan (vi du do cho nut TREND), mac dinh dung mau nut thuong.
-  final Color? accentColor;
+  /// Mau nen cua nut theo chuc nang (vi du PendantColors.pillRed cho POWER/TREND,
+  /// pillOlive cho UP/DOWN, pillGreen cho LEVEL). Mac dinh pillBlue neu khong chi dinh.
+  final Color? color;
 
   @override
   State<HoldButton> createState() => _HoldButtonState();
@@ -63,59 +66,54 @@ class _HoldButtonState extends State<HoldButton> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String?>(
-      valueListenable: PendantInputCoordinator.instance.activeCommand,
-      builder: (context, activeId, _) {
-        final isThisActive = activeId == widget.commandId;
-        final isBlockedByOther = activeId != null && !isThisActive;
-        final enabled = widget.connected && !isBlockedByOther;
+    final coordinator = PendantInputCoordinator.instance;
+    return AnimatedBuilder(
+      animation: Listenable.merge([coordinator.activeCommand, coordinator.activeSplitSelector]),
+      builder: (context, _) {
+        final isThisActive = coordinator.activeCommand.value == widget.commandId ||
+            coordinator.activeSplitSelector.value == widget.commandId;
+        final blocked = coordinator.isBlocked(widget.commandId);
+        final enabled = widget.connected && !blocked;
 
-        final Color faceColor = isThisActive
-            ? PendantColors.buttonFacePressed
-            : (widget.accentColor ?? PendantColors.buttonFace);
+        final Color baseColor = widget.color ?? PendantColors.pillBlue;
+        final Color faceColor =
+            isThisActive ? Color.lerp(baseColor, Colors.white, 0.35)! : baseColor;
 
         return Opacity(
-          opacity: enabled ? 1.0 : 0.45,
+          opacity: enabled ? 1.0 : 0.4,
           child: GestureDetector(
             onTapDown: enabled ? _handleTapDown : null,
             onTapUp: (_) => _handleRelease(),
             onTapCancel: _handleRelease,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: widget.diameter,
-                  height: widget.diameter,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: faceColor,
-                    boxShadow: isThisActive
-                        ? []
-                        : const [
-                            BoxShadow(
-                              color: Colors.black45,
-                              blurRadius: 3,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                  ),
-                  child: Icon(
-                    widget.icon,
-                    color: PendantColors.textDark,
-                    size: widget.diameter * 0.5,
-                  ),
+            child: Container(
+              height: widget.height,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: faceColor,
+                borderRadius: BorderRadius.circular(widget.height / 2),
+                boxShadow: isThisActive
+                    ? const []
+                    : const [
+                        BoxShadow(
+                          color: Colors.black38,
+                          blurRadius: 3,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+              ),
+              child: Text(
+                widget.label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.05,
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  widget.label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: PendantColors.textLight,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
