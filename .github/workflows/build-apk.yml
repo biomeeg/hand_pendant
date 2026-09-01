@@ -32,7 +32,12 @@ jobs:
       - name: Cai dat Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
+          # Khong ghim so phien ban cu the (vd '3.24.5') - luon lay ban stable moi nhat.
+          # Ly do: mot so thu vien (vd flutter_blue_plus_android) da cap nhat theo co che
+          # nap Flutter Gradle plugin kieu moi (tu Flutter 3.27 tro len). Neu CI dung ban
+          # Flutter cu hon, project Android sinh ra se dung dinh dang Gradle cu, gay loi
+          # "Could not get unknown property 'flutter' for extension 'android'" va
+          # "compileSdkVersion is not specified" khi build.
           channel: 'stable'
 
       - name: Tai thu vien Dart/Flutter
