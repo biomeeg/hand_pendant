@@ -72,6 +72,14 @@ const String kPrefConnectionPassword = 'pendant_connection_password';
 const Duration kHeartbeatInterval = Duration(milliseconds: 150);
 
 /// Danh sach day du cac ma lenh (khong bao gom bt_Stop) - dung de kiem tra hop le.
+///
+/// LUU Y ve 4 lenh bt_SplitLeg*: day van la 4 lenh BLE THAT khong doi (dung nguyen tu
+/// firmware goc). Tuy nhien tu ban co xac nhan tu nguoi dung ve cach hoat dong THAT cua
+/// tay bam (chi co 2 nut vat ly SPLIT LEG LEFT/RIGHT, phai bam dong thoi voi LEG UP/
+/// DOWN), giao dien app KHONG con 4 nut rieng goi thang 4 lenh nay nua - app chi hien
+/// thi 2 nut "chon ben" (xem kSplitSelectorLeft/Right trong hold_command_controller.dart)
+/// va PendantInputCoordinator se TU CHON dung 1 trong 4 lenh nay de gui khi ca nut chon
+/// ben VA nut LEG UP/DOWN cung dang duoc giu.
 const List<String> kAllCommandIds = [
   'bt_Power',
   'bt_FloorLock',

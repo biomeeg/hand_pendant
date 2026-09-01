@@ -15,6 +15,20 @@ class PendantColors {
   static const Color textLight = Color(0xFFF5F5F5);
   static const Color textDark = Color(0xFF20242C);
   static const Color disabledOverlay = Color(0x66000000);
+
+  // --- Mau nut dang "vien thuoc" (pill), tham khao theo anh giao dien mau nguoi dung
+  // gui - moi mau ung voi 1 nhom chuc nang, khong con phu thuoc icon nhu truoc. ---
+  static const Color pillBlue = Color(0xFF6C82D6); // nut dieu khien thong thuong
+  static const Color pillOlive = Color(0xFF56701F); // nut UP/DOWN (BACK/TABLE/LEG)
+  static const Color pillRed = Color(0xFFCC2B33); // POWER, TREND
+  static const Color pillGreen = Color(0xFF63B62E); // LEVEL
+
+  /// Mau nen phu (tint) danh rieng cho nhom 4 nut LIEN QUAN nhau: LEG UP, LEG DOWN,
+  /// SPLIT LEG LEFT, SPLIT LEG RIGHT. 2 nut SPLIT LEG chi co tac dung khi bam DONG THOI
+  /// voi LEG UP/DOWN (xem PendantInputCoordinator) - phu 1 mang mau teal nay quanh ca 2
+  /// cum nut (cot LEG trong bang BACK/TABLE/LEG, va hang SPLIT LEG rieng ben duoi) de
+  /// nguoi dung nhan ra chung cung 1 nhom chuc nang, du khong nam sat nhau tren man hinh.
+  static const Color linkedGroupTint = Color(0xFF2F8F8F);
 }
 
 ThemeData buildPendantAppTheme() {

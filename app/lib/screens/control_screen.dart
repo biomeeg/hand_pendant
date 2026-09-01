@@ -13,13 +13,22 @@ import 'settings_screen.dart';
 
 const String kPrefPendantType = 'pendant_type';
 
-/// Man hinh dieu khien chinh, bo cuc phong theo tay bam vat ly that (thay doi theo
-/// PendantType: D760 co hang InstaDrive, D850 co hang Slide + Kidney).
+/// Man hinh dieu khien chinh, bo cuc dang nut "vien thuoc" (pill) mau theo chuc nang -
+/// tham khao theo mau giao dien app tuong tu nguoi dung cung cap - thay doi theo
+/// PendantType: D760 co hang InstaDrive, D850 co hang Slide + Kidney.
 ///
 /// Cac nut CHI mo khoa khi vua co ket noi BLE ("connected") VA da xac thuc dung mat
 /// khau ("authenticated" - xem PendantAuthController). Rieng nut DUNG KHAN CAP luon
 /// hoat dong khi co ket noi, ke ca truoc khi xac thuc, vi lenh bt_Stop luon duoc
 /// firmware chap nhan (chi mo relay, khong bao gio nguy hiem).
+///
+/// SPLIT LEG: tren tay bam THAT chi co 2 nut vat ly LEFT/RIGHT - de nang/ha 1 ben chan
+/// phai bam DONG THOI voi nut LEG UP/DOWN (o cot LEG trong bang BACK/TABLE/LEG). Vi vay
+/// 2 nut LEFT/RIGHT o day la "nut chon ben", chi thuc su tao chuyen dong khi giu chung
+/// voi LEG UP/DOWN - xem PendantInputCoordinator (hold_command_controller.dart) de biet
+/// logic ket hop 2 nut. De the hien 4 nut LEG UP, LEG DOWN, SPLIT LEFT, SPLIT RIGHT lien
+/// quan chuc nang voi nhau, ca cot LEG va hang SPLIT LEG duoc phu chung 1 mau nen teal
+/// (PendantColors.linkedGroupTint).
 class ControlScreen extends StatefulWidget {
   const ControlScreen({super.key});
 
@@ -114,42 +123,35 @@ class _ControlScreenState extends State<ControlScreen> {
                     else
                       Expanded(
                         child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
                           child: Column(
                             children: [
                               _topRow(unlocked),
                               const SizedBox(height: 4),
                               if (_pendantType == PendantType.d760) ...[
-                                _sectionLabel('INSTADRIVE'),
                                 _instaDriveRow(unlocked),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                               ],
-                              _sectionLabel('BACK / TABLE / LEG'),
                               _backTableLegSection(unlocked),
-                              const SizedBox(height: 6),
-                              _sectionLabel('SPLIT LEG'),
+                              const SizedBox(height: 4),
                               _splitLegRow(unlocked),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               _trendRow(unlocked),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               if (_pendantType == PendantType.d850) ...[
-                                _sectionLabel('SLIDE'),
                                 _slideRow(unlocked),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                               ],
-                              _sectionLabel('TILT'),
                               _tiltRow(unlocked),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               if (_pendantType == PendantType.d850) ...[
-                                _sectionLabel('KIDNEY'),
                                 _kidneyRow(unlocked),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                               ],
-                              _sectionLabel('PRESET'),
                               _presetRow(unlocked),
-                              const SizedBox(height: 6),
-                              _levelButton(unlocked),
-                              const SizedBox(height: 72),
+                              const SizedBox(height: 4),
+                              SizedBox(width: double.infinity, child: _levelButton(unlocked)),
+                              const SizedBox(height: 64),
                             ],
                           ),
                         ),
@@ -247,237 +249,190 @@ class _ControlScreenState extends State<ControlScreen> {
   // Cac khoi giao dien con
   // ----------------------------------------------------------------------
 
-  Widget _sectionLabel(String text) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
+  /// Hop bao quanh 1 nhom nut co PHU MAU NEN TEAL de bao hieu "cac nut nay lien quan
+  /// chuc nang voi nhau" (dung cho cot LEG va hang SPLIT LEG - xem chu thich dau file).
+  Widget _linkedGroupBox(Widget child) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        decoration: BoxDecoration(
+          color: PendantColors.linkedGroupTint.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: PendantColors.linkedGroupTint.withOpacity(0.6)),
+        ),
+        child: child,
+      );
+
+  /// Hop trong suot cung kich thuoc/padding voi [_linkedGroupBox], dung cho cac cot
+  /// KHONG lien quan (BACK, TABLE) de giu thang hang voi cot LEG co vien mau.
+  Widget _plainGroupBox(Widget child) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.transparent),
+        ),
+        child: child,
+      );
+
+  /// 1 hang gom: nut trai - nhan ten nhom o giua - nut phai, chia deu 3 phan bang nhau
+  /// (tham khao theo mau giao dien: INSTADRIVE, TREND, SLIDE, TILT, KIDNEY, PRESET).
+  Widget _pairRow(Widget left, String label, Widget right) => Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: left),
+          Expanded(
+            child: Center(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
           ),
-        ),
-      );
-
-  Widget _row(List<Widget> children) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: children,
-      );
-
-  Widget _topRow(bool unlocked) => _row([
-        HoldButton(
-          commandId: 'bt_Power',
-          label: 'POWER',
-          icon: Icons.power_settings_new,
-          connected: unlocked,
-        ),
-        HoldButton(
-          commandId: 'bt_FloorLock',
-          label: 'FLOOR LOCK',
-          icon: Icons.lock_outline,
-          connected: unlocked,
-        ),
-        HoldButton(
-          commandId: 'bt_RevPosition',
-          label: 'REV POSITION',
-          icon: Icons.change_circle_outlined,
-          connected: unlocked,
-        ),
-      ]);
-
-  Widget _instaDriveRow(bool unlocked) => _row([
-        HoldButton(
-          commandId: 'bt_InstaDriveREV',
-          label: 'REV',
-          icon: Icons.arrow_back,
-          connected: unlocked,
-        ),
-        HoldButton(
-          commandId: 'bt_InstaDriveFWD',
-          label: 'FWD',
-          icon: Icons.arrow_forward,
-          connected: unlocked,
-        ),
-      ]);
-
-  Widget _backTableLegSection(bool unlocked) => Column(
-        children: [
-          _row([
-            _labeledColumn('BACK', HoldButton(
-              commandId: 'bt_BackUp',
-              label: 'UP',
-              icon: Icons.arrow_upward,
-              connected: unlocked,
-            )),
-            _labeledColumn('TABLE', HoldButton(
-              commandId: 'bt_TableUp',
-              label: 'UP',
-              icon: Icons.arrow_upward,
-              connected: unlocked,
-            )),
-            _labeledColumn('LEG', HoldButton(
-              commandId: 'bt_LegUp',
-              label: 'UP',
-              icon: Icons.arrow_upward,
-              connected: unlocked,
-            )),
-          ]),
-          const SizedBox(height: 4),
-          _row([
-            HoldButton(
-              commandId: 'bt_BackDown',
-              label: 'DOWN',
-              icon: Icons.arrow_downward,
-              connected: unlocked,
-            ),
-            HoldButton(
-              commandId: 'bt_TableDown',
-              label: 'DOWN',
-              icon: Icons.arrow_downward,
-              connected: unlocked,
-            ),
-            HoldButton(
-              commandId: 'bt_LegDown',
-              label: 'DOWN',
-              icon: Icons.arrow_downward,
-              connected: unlocked,
-            ),
-          ]),
+          Expanded(child: right),
         ],
       );
 
-  Widget _labeledColumn(String title, Widget button) => Column(
+  Widget _topRow(bool unlocked) => Row(
         children: [
-          Text(title,
+          Expanded(
+            child: HoldButton(
+              commandId: 'bt_Power',
+              label: 'POWER ON/OFF',
+              color: PendantColors.pillRed,
+              connected: unlocked,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: HoldButton(
+              commandId: 'bt_FloorLock',
+              label: 'FLOOR LOCK',
+              connected: unlocked,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: HoldButton(
+              commandId: 'bt_RevPosition',
+              label: 'REV POSITION',
+              connected: unlocked,
+            ),
+          ),
+        ],
+      );
+
+  Widget _instaDriveRow(bool unlocked) => _pairRow(
+        HoldButton(commandId: 'bt_InstaDriveREV', label: 'REV', connected: unlocked),
+        'INSTADRIVE',
+        HoldButton(commandId: 'bt_InstaDriveFWD', label: 'FWD', connected: unlocked),
+      );
+
+  Widget _backTableLegSection(bool unlocked) {
+    Widget upDownColumn(String upId, String downId, String title) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            HoldButton(
+              commandId: upId,
+              label: 'UP',
+              color: PendantColors.pillOlive,
+              connected: unlocked,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                  color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 2),
-          button,
-        ],
+                color: PendantColors.pillRed,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            HoldButton(
+              commandId: downId,
+              label: 'DOWN',
+              color: PendantColors.pillOlive,
+              connected: unlocked,
+            ),
+          ],
+        );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _plainGroupBox(upDownColumn('bt_BackUp', 'bt_BackDown', 'BACK')),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: _plainGroupBox(upDownColumn('bt_TableUp', 'bt_TableDown', 'TABLE')),
+        ),
+        const SizedBox(width: 4),
+        // Cot LEG duoc phu mau teal - lien quan chuc nang voi hang SPLIT LEG ben duoi
+        // (giu/nha dong thoi voi 1 trong 2 nut LEFT/RIGHT cua SPLIT LEG).
+        Expanded(
+          child: _linkedGroupBox(upDownColumn('bt_LegUp', 'bt_LegDown', 'LEG')),
+        ),
+      ],
+    );
+  }
+
+  /// Tren tay bam THAT chi co 2 nut LEFT/RIGHT (khong phai 4 nut rieng nhu truoc). Giu
+  /// LEFT (hoac RIGHT) DONG THOI voi LEG UP/DOWN o tren se tao chuyen dong nang/ha 1 ben
+  /// chan - xem PendantInputCoordinator. Phu cung mau teal voi cot LEG de the hien 4 nut
+  /// nay (LEG UP, LEG DOWN, SPLIT LEFT, SPLIT RIGHT) lien quan chuc nang voi nhau.
+  Widget _splitLegRow(bool unlocked) => _linkedGroupBox(
+        _pairRow(
+          HoldButton(commandId: kSplitSelectorLeft, label: 'LEFT', connected: unlocked),
+          'SPLIT LEG',
+          HoldButton(commandId: kSplitSelectorRight, label: 'RIGHT', connected: unlocked),
+        ),
       );
 
-  Widget _splitLegRow(bool unlocked) => Column(
-        children: [
-          _row([
-            HoldButton(
-              commandId: 'bt_SplitLegLeftUp',
-              label: 'LEFT UP',
-              icon: Icons.north_west,
-              connected: unlocked,
-            ),
-            HoldButton(
-              commandId: 'bt_SplitLegRightUp',
-              label: 'RIGHT UP',
-              icon: Icons.north_east,
-              connected: unlocked,
-            ),
-          ]),
-          const SizedBox(height: 4),
-          _row([
-            HoldButton(
-              commandId: 'bt_SplitLegLeftDown',
-              label: 'LEFT DOWN',
-              icon: Icons.south_west,
-              connected: unlocked,
-            ),
-            HoldButton(
-              commandId: 'bt_SplitLegRightDown',
-              label: 'RIGHT DOWN',
-              icon: Icons.south_east,
-              connected: unlocked,
-            ),
-          ]),
-        ],
-      );
-
-  Widget _trendRow(bool unlocked) => _row([
+  Widget _trendRow(bool unlocked) => _pairRow(
         HoldButton(
           commandId: 'bt_TrendTrend',
           label: 'TREND',
-          icon: Icons.airline_seat_flat,
-          connected: unlocked,
-          accentColor: PendantColors.trendRed,
-        ),
-        HoldButton(
-          commandId: 'bt_TrendRev',
-          label: 'TREND REV',
-          icon: Icons.airline_seat_flat_angled,
+          color: PendantColors.pillRed,
           connected: unlocked,
         ),
-      ]);
+        'TREND',
+        HoldButton(commandId: 'bt_TrendRev', label: 'REV', connected: unlocked),
+      );
 
-  Widget _slideRow(bool unlocked) => _row([
-        HoldButton(
-          commandId: 'bt_SlideHead',
-          label: 'HEAD',
-          icon: Icons.arrow_back,
-          connected: unlocked,
-        ),
-        HoldButton(
-          commandId: 'bt_SlideFoot',
-          label: 'FOOT',
-          icon: Icons.arrow_forward,
-          connected: unlocked,
-        ),
-      ]);
+  Widget _slideRow(bool unlocked) => _pairRow(
+        HoldButton(commandId: 'bt_SlideHead', label: 'HEAD', connected: unlocked),
+        'SLIDE',
+        HoldButton(commandId: 'bt_SlideFoot', label: 'FOOT', connected: unlocked),
+      );
 
-  Widget _tiltRow(bool unlocked) => _row([
-        HoldButton(
-          commandId: 'bt_TiltLeft',
-          label: 'LEFT',
-          icon: Icons.rotate_left,
-          connected: unlocked,
-        ),
-        HoldButton(
-          commandId: 'bt_TiltRight',
-          label: 'RIGHT',
-          icon: Icons.rotate_right,
-          connected: unlocked,
-        ),
-      ]);
+  Widget _tiltRow(bool unlocked) => _pairRow(
+        HoldButton(commandId: 'bt_TiltLeft', label: 'LEFT', connected: unlocked),
+        'TILT',
+        HoldButton(commandId: 'bt_TiltRight', label: 'RIGHT', connected: unlocked),
+      );
 
-  Widget _kidneyRow(bool unlocked) => _row([
-        HoldButton(
-          commandId: 'bt_KidneyUp',
-          label: 'UP',
-          icon: Icons.keyboard_arrow_up,
-          connected: unlocked,
-        ),
-        HoldButton(
-          commandId: 'bt_KidneyDown',
-          label: 'DOWN',
-          icon: Icons.keyboard_arrow_down,
-          connected: unlocked,
-        ),
-      ]);
+  Widget _kidneyRow(bool unlocked) => _pairRow(
+        HoldButton(commandId: 'bt_KidneyUp', label: 'UP', connected: unlocked),
+        'KIDNEY',
+        HoldButton(commandId: 'bt_KidneyDown', label: 'DOWN', connected: unlocked),
+      );
 
-  Widget _presetRow(bool unlocked) => _row([
-        HoldButton(
-          commandId: 'bt_PresetFlex',
-          label: 'FLEX',
-          icon: Icons.airline_seat_individual_suite,
-          connected: unlocked,
-        ),
-        HoldButton(
-          commandId: 'bt_PresetChair',
-          label: 'CHAIR',
-          icon: Icons.chair_alt,
-          connected: unlocked,
-        ),
-      ]);
+  Widget _presetRow(bool unlocked) => _pairRow(
+        HoldButton(commandId: 'bt_PresetFlex', label: 'FLEX', connected: unlocked),
+        'PRESET',
+        HoldButton(commandId: 'bt_PresetChair', label: 'CHAIR', connected: unlocked),
+      );
 
-  Widget _levelButton(bool unlocked) => Center(
-        child: SizedBox(
-          width: 200,
-          child: HoldButton(
-            commandId: 'bt_Level',
-            label: 'LEVEL',
-            icon: Icons.horizontal_rule,
-            connected: unlocked,
-            diameter: 44,
-          ),
-        ),
+  Widget _levelButton(bool unlocked) => HoldButton(
+        commandId: 'bt_Level',
+        label: 'LEVEL',
+        color: PendantColors.pillGreen,
+        connected: unlocked,
       );
 }
 
